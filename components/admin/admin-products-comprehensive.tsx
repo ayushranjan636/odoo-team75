@@ -64,7 +64,6 @@ export function AdminProductsComprehensive() {
     name: "",
     description: "",
     category: "",
-    basePrice: 0,
     specifications: {},
     images: [],
     availability: {
@@ -92,27 +91,31 @@ export function AdminProductsComprehensive() {
   const categories = Array.from(new Set(products.map(p => p.category)))
 
   const handleAddProduct = async () => {
-    if (!newProduct.name || !newProduct.category || newProduct.basePrice <= 0) {
-      toast.error("Please fill in all required fields")
+    if (!newProduct.name || !newProduct.category || newProduct.pricing.daily <= 0) {
+      toast.error("Please fill in all required fields including daily pricing")
       return
     }
 
     const result = await addProduct({
-      ...newProduct,
-      id: `prod-${Date.now()}`,
-      slug: newProduct.name.toLowerCase().replace(/\s+/g, '-'),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      name: newProduct.name,
+      description: newProduct.description,
+      category: newProduct.category,
+      images: newProduct.images,
+      pricing: newProduct.pricing,
+      specifications: newProduct.specifications,
+      availability: {
+        ...newProduct.availability,
+        location: "" // Add default location
+      }
     })
 
     if (result.success) {
-      toast.success("Product added successfully!")
+      toast.success(result.message || "Product added successfully!")
       setIsAddDialogOpen(false)
       setNewProduct({
         name: "",
         description: "",
         category: "",
-        basePrice: 0,
         specifications: {},
         images: [],
         availability: {
@@ -185,7 +188,7 @@ export function AdminProductsComprehensive() {
             <DialogHeader>
               <DialogTitle>Add New Product</DialogTitle>
               <DialogDescription>
-                Create a new product for your rental inventory. It will be synced with Odoo.
+                Create a new product for your rental inventory. It will be automatically created in Odoo and synced with your inventory system.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -215,13 +218,19 @@ export function AdminProductsComprehensive() {
                 </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="basePrice" className="text-right">Base Price *</Label>
+                <Label htmlFor="dailyPrice" className="text-right">Daily Price *</Label>
                 <Input 
-                  id="basePrice" 
+                  id="dailyPrice" 
                   type="number" 
                   className="col-span-3"
-                  value={newProduct.basePrice}
-                  onChange={(e) => setNewProduct({...newProduct, basePrice: Number(e.target.value)})}
+                  value={newProduct.pricing.daily}
+                  onChange={(e) => setNewProduct({
+                    ...newProduct, 
+                    pricing: {
+                      ...newProduct.pricing,
+                      daily: Number(e.target.value)
+                    }
+                  })}
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -323,7 +332,6 @@ export function AdminProductsComprehensive() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Category</TableHead>
-                <TableHead>Base Price</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Odoo Sync</TableHead>
@@ -336,7 +344,7 @@ export function AdminProductsComprehensive() {
                   <TableCell className="font-medium">
                     <div>
                       <p>{product.name}</p>
-                      <p className="text-xs text-muted-foreground">{product.slug}</p>
+                      <p className="text-xs text-muted-foreground">{product.id}</p>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -344,7 +352,6 @@ export function AdminProductsComprehensive() {
                       {product.category.charAt(0).toUpperCase() + product.category.slice(1)}
                     </Badge>
                   </TableCell>
-                  <TableCell>₹{product.basePrice}</TableCell>
                   <TableCell>{product.availability.stock}</TableCell>
                   <TableCell>
                     <Badge variant={product.availability.isAvailable ? "default" : "destructive"}>
@@ -354,7 +361,7 @@ export function AdminProductsComprehensive() {
                   <TableCell>
                     <Badge variant="outline" className="text-green-600">
                       <ExternalLink className="w-3 h-3 mr-1" />
-                      Synced
+                      {product.odooId ? 'Synced' : 'Local Only'}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -403,16 +410,6 @@ export function AdminProductsComprehensive() {
                   className="col-span-3"
                   value={editingProduct.name}
                   onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})}
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-basePrice" className="text-right">Base Price *</Label>
-                <Input 
-                  id="edit-basePrice" 
-                  type="number" 
-                  className="col-span-3"
-                  value={editingProduct.basePrice}
-                  onChange={(e) => setEditingProduct({...editingProduct, basePrice: Number(e.target.value)})}
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">

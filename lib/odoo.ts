@@ -530,4 +530,199 @@ export const createOdooReservation = async (reservationData: Partial<Reservation
   }
 };
 
+// Create a new product in Odoo
+export const createOdooProduct = async (productData: {
+  name: string;
+  description: string;
+  category: string;
+  pricing: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+    deposit: number;
+  };
+  specifications: Record<string, string>;
+  availability: {
+    isAvailable: boolean;
+    stock: number;
+    location: string;
+  };
+}): Promise<{ success: boolean; odooId?: string; error?: string }> => {
+  try {
+    await ensureOdooConnected();
+
+    // Map frontend category to Odoo category ID
+    const getCategoryId = (category: string): number => {
+      const categoryMap: Record<string, number> = {
+        'furniture': 1,
+        'electronics': 2,
+        'appliances': 3,
+        'tools': 4,
+        'sports': 5,
+        'automotive': 6,
+      };
+      return categoryMap[category.toLowerCase()] || 1; // Default to category 1
+    };
+
+    // Create the product in Odoo
+    const odooProductData = {
+      name: productData.name,
+      description: productData.description,
+      categ_id: getCategoryId(productData.category),
+      type: 'product', // Storable product
+      list_price: productData.pricing.daily,
+      standard_price: productData.pricing.daily * 0.6, // Cost price (60% of selling price)
+      sale_ok: true,
+      purchase_ok: true,
+      rental_ok: true, // Enable for rental if available
+      active: productData.availability.isAvailable,
+      // Add custom fields for rental pricing
+      x_rental_daily_price: productData.pricing.daily,
+      x_rental_weekly_price: productData.pricing.weekly,
+      x_rental_monthly_price: productData.pricing.monthly,
+      x_rental_deposit: productData.pricing.deposit,
+      x_rental_location: productData.availability.location,
+    };
+
+    const productId = await odoo.create("product.template", odooProductData);
+
+    // Update stock quantities if needed
+    if (productData.availability.stock > 0) {
+      try {
+        // Find the product variant (product.product) created automatically
+        const variants = await odoo.searchRead("product.product", [
+          ["product_tmpl_id", "=", productId]
+        ], ["id"], { limit: 1 });
+
+        if (variants.length > 0) {
+          const variantId = (variants[0] as any).id;
+          
+          // Create stock quant to set initial inventory
+          await odoo.create("stock.quant", {
+            product_id: variantId,
+            location_id: 8, // Stock location (adjust based on your Odoo setup)
+            quantity: productData.availability.stock,
+            inventory_quantity: productData.availability.stock,
+          });
+        }
+      } catch (stockError) {
+        console.warn("Failed to set initial stock:", stockError);
+        // Continue without failing the product creation
+      }
+    }
+
+    console.log(`[Odoo] Product created successfully with ID: ${productId}`);
+    return { success: true, odooId: productId.toString() };
+
+  } catch (error) {
+    console.error("[Odoo] Product creation failed:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    return { success: false, error: `Failed to create product in Odoo: ${errorMessage}` };
+  }
+};
+
+// Update an existing product in Odoo
+export const updateOdooProduct = async (odooId: string, updates: Partial<{
+  name: string;
+  description: string;
+  pricing: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+    deposit: number;
+  };
+  availability: {
+    isAvailable: boolean;
+    stock: number;
+    location: string;
+  };
+}>): Promise<{ success: boolean; error?: string }> => {
+  try {
+    await ensureOdooConnected();
+
+    const updateData: any = {};
+
+    if (updates.name) updateData.name = updates.name;
+    if (updates.description) updateData.description = updates.description;
+    if (updates.availability?.isAvailable !== undefined) {
+      updateData.active = updates.availability.isAvailable;
+    }
+    if (updates.pricing) {
+      updateData.list_price = updates.pricing.daily;
+      updateData.x_rental_daily_price = updates.pricing.daily;
+      updateData.x_rental_weekly_price = updates.pricing.weekly;
+      updateData.x_rental_monthly_price = updates.pricing.monthly;
+      updateData.x_rental_deposit = updates.pricing.deposit;
+    }
+    if (updates.availability?.location) {
+      updateData.x_rental_location = updates.availability.location;
+    }
+
+    await (odoo as any).update("product.template", parseInt(odooId), updateData);
+
+    // Update stock if needed
+    if (updates.availability?.stock !== undefined) {
+      try {
+        const variants = await odoo.searchRead("product.product", [
+          ["product_tmpl_id", "=", parseInt(odooId)]
+        ], ["id"], { limit: 1 });
+
+        if (variants.length > 0) {
+          const variantId = (variants[0] as any).id;
+          
+          // Update stock quant
+          const quants = await odoo.searchRead("stock.quant", [
+            ["product_id", "=", variantId],
+            ["location_id", "=", 8]
+          ], ["id"], { limit: 1 });
+
+          if (quants.length > 0) {
+            await (odoo as any).update("stock.quant", (quants[0] as any).id, {
+              quantity: updates.availability.stock,
+              inventory_quantity: updates.availability.stock,
+            });
+          } else {
+            // Create new stock quant
+            await odoo.create("stock.quant", {
+              product_id: variantId,
+              location_id: 8,
+              quantity: updates.availability.stock,
+              inventory_quantity: updates.availability.stock,
+            });
+          }
+        }
+      } catch (stockError) {
+        console.warn("Failed to update stock:", stockError);
+      }
+    }
+
+    console.log(`[Odoo] Product ${odooId} updated successfully`);
+    return { success: true };
+
+  } catch (error) {
+    console.error("[Odoo] Product update failed:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    return { success: false, error: `Failed to update product in Odoo: ${errorMessage}` };
+  }
+};
+
+// Delete a product from Odoo
+export const deleteOdooProduct = async (odooId: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    await ensureOdooConnected();
+
+    // Instead of deleting, we'll archive the product (set active=false)
+    // This is the recommended approach in Odoo to maintain data integrity
+    await (odoo as any).update("product.template", parseInt(odooId), { active: false });
+
+    console.log(`[Odoo] Product ${odooId} archived successfully`);
+    return { success: true };
+
+  } catch (error) {
+    console.error("[Odoo] Product archival failed:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    return { success: false, error: `Failed to archive product in Odoo: ${errorMessage}` };
+  }
+};
+
 export default odoo;

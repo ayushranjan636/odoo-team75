@@ -424,12 +424,12 @@ export function AdminOrdersComprehensive() {
                 <CardContent>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <Label className="text-muted-foreground">Start Date</Label>
-                      <p className="font-medium">{new Date(selectedOrder.startDate).toLocaleDateString()}</p>
+                      <Label className="text-muted-foreground">Delivery Date</Label>
+                      <p className="font-medium">{new Date(selectedOrder.deliveryDate).toLocaleDateString()}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">End Date</Label>
-                      <p className="font-medium">{new Date(selectedOrder.endDate).toLocaleDateString()}</p>
+                      <Label className="text-muted-foreground">Return Date</Label>
+                      <p className="font-medium">{new Date(selectedOrder.returnDate).toLocaleDateString()}</p>
                     </div>
                   </div>
                 </CardContent>

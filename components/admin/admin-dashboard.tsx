@@ -6,9 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { AdminProductsPage } from "@/components/admin/admin-products-page"
-import { AdminOrdersPage } from "@/components/admin/admin-orders-page"
-import { AdminPricingPage } from "@/components/admin/admin-pricing-page"
+import { AdminProductsComprehensive } from "@/components/admin/admin-products-comprehensive"
+import { AdminOrdersComprehensive } from "@/components/admin/admin-orders-comprehensive"
+import { AdminPricingComprehensive } from "@/components/admin/admin-pricing-comprehensive"
 import { toast } from "sonner"
 import { 
   Package, 
@@ -24,6 +24,7 @@ import {
 export function AdminDashboard() {
   const { products, orders, syncWithOdoo, fetchProducts, fetchOrders } = useAdminStore()
   const [isSyncing, setIsSyncing] = useState(false)
+  const [isTestingOdoo, setIsTestingOdoo] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
 
   useEffect(() => {
@@ -36,12 +37,30 @@ export function AdminDashboard() {
     const result = await syncWithOdoo()
     
     if (result.success) {
-      toast.success("Successfully synced with Odoo!")
+      toast.success(result.message || "Successfully synced with Odoo!")
     } else {
       toast.error(result.error || "Failed to sync with Odoo")
     }
     
     setIsSyncing(false)
+  }
+
+  const handleTestOdooConnection = async () => {
+    setIsTestingOdoo(true)
+    try {
+      const response = await fetch('/api/admin/test-odoo')
+      const result = await response.json()
+      
+      if (result.success) {
+        toast.success("Odoo connection test successful!")
+      } else {
+        toast.error(`Odoo connection failed: ${result.error}`)
+      }
+    } catch (error) {
+      toast.error("Failed to test Odoo connection")
+      console.error('Odoo test error:', error)
+    }
+    setIsTestingOdoo(false)
   }
 
   // Calculate stats
@@ -76,6 +95,15 @@ export function AdminDashboard() {
         >
           <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
           {isSyncing ? 'Syncing...' : 'Sync with Odoo'}
+        </Button>
+        <Button 
+          onClick={handleTestOdooConnection} 
+          disabled={isTestingOdoo}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isTestingOdoo ? 'animate-spin' : ''}`} />
+          {isTestingOdoo ? 'Testing...' : 'Test Odoo Connection'}
         </Button>
       </div>
 
@@ -211,15 +239,15 @@ export function AdminDashboard() {
         </TabsContent>
 
         <TabsContent value="products">
-          <AdminProductsPage />
+          <AdminProductsComprehensive />
         </TabsContent>
 
         <TabsContent value="orders">
-          <AdminOrdersPage />
+          <AdminOrdersComprehensive />
         </TabsContent>
 
         <TabsContent value="pricing">
-          <AdminPricingPage />
+          <AdminPricingComprehensive />
         </TabsContent>
       </Tabs>
     </div>

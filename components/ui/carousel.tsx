@@ -1,10 +1,5 @@
 "use client"
 
-// This is a placeholder for shadcn/ui's carousel component.
-// In a real project, you would install it via `npx shadcn@latest add carousel`
-// For v0, we assume it's available.
-// I'm providing a minimal structure to make it work with the mock data.
-
 import * as React from "react"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"

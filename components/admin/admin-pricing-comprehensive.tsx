@@ -272,13 +272,13 @@ export function AdminPricingComprehensive() {
                     Recommended Pricing
                   </CardTitle>
                   <CardDescription>
-                    Based on base price of ₹{selectedProduct.basePrice.toLocaleString()}
+                    Based on current daily rate of ₹{selectedProduct.pricing.daily.toLocaleString()}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {(() => {
-                      const recommended = calculateRecommendedPricing(selectedProduct.basePrice)
+                      const recommended = calculateRecommendedPricing(selectedProduct.pricing.daily)
                       return (
                         <>
                           <div className="text-center">

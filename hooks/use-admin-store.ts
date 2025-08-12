@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { createOdooProduct, updateOdooProduct, deleteOdooProduct } from '@/lib/odoo'
 
 export interface Product {
   id: string
@@ -59,16 +60,16 @@ interface AdminState {
   orders: Order[]
   
   // Product Management
-  addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; error?: string }>
-  updateProduct: (id: string, updates: Partial<Product>) => Promise<{ success: boolean; error?: string }>
-  deleteProduct: (id: string) => Promise<{ success: boolean; error?: string }>
+  addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; error?: string; message?: string }>
+  updateProduct: (id: string, updates: Partial<Product>) => Promise<{ success: boolean; error?: string; message?: string }>
+  deleteProduct: (id: string) => Promise<{ success: boolean; error?: string; message?: string }>
   
   // Order Management
   updateOrderStatus: (orderId: string, status: Order['status']) => Promise<{ success: boolean; error?: string }>
   updatePaymentStatus: (orderId: string, status: Order['paymentStatus']) => Promise<{ success: boolean; error?: string }>
   
   // Odoo Integration
-  syncWithOdoo: () => Promise<{ success: boolean; error?: string }>
+  syncWithOdoo: () => Promise<{ success: boolean; error?: string; message?: string }>
   
   // Data fetching
   fetchProducts: () => Promise<void>
@@ -205,31 +206,61 @@ export const useAdminStore = create<AdminState>()(
 
       addProduct: async (productData) => {
         try {
+          // Create product in Odoo first
+          const odooResponse = await createOdooProduct({
+            name: productData.name,
+            description: productData.description,
+            category: productData.category,
+            pricing: productData.pricing,
+            specifications: productData.specifications,
+            availability: productData.availability
+          });
+
+          if (!odooResponse.success) {
+            return { success: false, error: odooResponse.error || 'Failed to create product in Odoo' };
+          }
+
           const newProduct: Product = {
             ...productData,
             id: `PROD-${Date.now()}`,
+            odooId: odooResponse.odooId,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
-          }
-
-          // Simulate Odoo integration
-          const odooResponse = await simulateOdooProductCreate(newProduct)
-          if (odooResponse.success) {
-            newProduct.odooId = odooResponse.odooId
           }
 
           set(state => ({
             products: [...state.products, newProduct]
           }))
 
-          return { success: true }
+          return { success: true, message: 'Product created successfully and synced with Odoo' }
         } catch (error) {
-          return { success: false, error: 'Failed to add product' }
+          console.error('Error adding product:', error);
+          return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Failed to add product'
+          }
         }
       },
 
       updateProduct: async (id, updates) => {
         try {
+          const product = get().products.find(p => p.id === id);
+          
+          // Update in Odoo if product has odooId
+          if (product?.odooId) {
+            const odooResponse = await updateOdooProduct(product.odooId, {
+              name: updates.name,
+              description: updates.description,
+              pricing: updates.pricing,
+              availability: updates.availability
+            });
+
+            if (!odooResponse.success) {
+              return { success: false, error: odooResponse.error || 'Failed to update product in Odoo' };
+            }
+          }
+
+          // Update local state
           set(state => ({
             products: state.products.map(product =>
               product.id === id
@@ -238,29 +269,41 @@ export const useAdminStore = create<AdminState>()(
             )
           }))
 
-          // Simulate Odoo sync
-          await simulateOdooProductUpdate(id, updates)
-
-          return { success: true }
+          return { success: true, message: 'Product updated successfully and synced with Odoo' }
         } catch (error) {
-          return { success: false, error: 'Failed to update product' }
+          console.error('Error updating product:', error);
+          return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Failed to update product'
+          }
         }
       },
 
       deleteProduct: async (id) => {
         try {
-          const product = get().products.find(p => p.id === id)
+          const product = get().products.find(p => p.id === id);
+          
+          // Archive in Odoo if product has odooId
           if (product?.odooId) {
-            await simulateOdooProductDelete(product.odooId)
+            const odooResponse = await deleteOdooProduct(product.odooId);
+            
+            if (!odooResponse.success) {
+              return { success: false, error: odooResponse.error || 'Failed to archive product in Odoo' };
+            }
           }
 
+          // Remove from local state
           set(state => ({
             products: state.products.filter(product => product.id !== id)
           }))
 
-          return { success: true }
+          return { success: true, message: 'Product archived successfully in Odoo and removed locally' }
         } catch (error) {
-          return { success: false, error: 'Failed to delete product' }
+          console.error('Error deleting product:', error);
+          return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Failed to delete product'
+          }
         }
       },
 
@@ -296,11 +339,46 @@ export const useAdminStore = create<AdminState>()(
 
       syncWithOdoo: async () => {
         try {
-          // Simulate Odoo sync
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          return { success: true }
+          // Import getOdooProducts to fetch latest products from Odoo
+          const { getOdooProducts } = await import('@/lib/odoo');
+          
+          // Fetch products from Odoo
+          const odooProducts = await getOdooProducts();
+          
+          // Convert Odoo products to our Product format
+          const convertedProducts = odooProducts.map(odooProduct => ({
+            id: odooProduct.id,
+            name: odooProduct.name,
+            description: odooProduct.description || '',
+            category: odooProduct.category.toLowerCase(),
+            images: odooProduct.images || ['/placeholder.jpg'],
+            pricing: {
+              daily: odooProduct.pricePerTenure || 0,
+              weekly: (odooProduct.pricePerTenure || 0) * 6,
+              monthly: (odooProduct.pricePerTenure || 0) * 25,
+              deposit: (odooProduct.pricePerTenure || 0) * 2
+            },
+            specifications: {},
+            availability: {
+              isAvailable: odooProduct.qtyOnHand > 0,
+              stock: odooProduct.qtyOnHand || 0,
+              location: 'Warehouse'
+            },
+            odooId: odooProduct.id,
+            createdAt: odooProduct.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }));
+
+          // Update local state with Odoo products
+          set({ products: convertedProducts });
+
+          return { success: true, message: `Successfully synced ${convertedProducts.length} products from Odoo` };
         } catch (error) {
-          return { success: false, error: 'Failed to sync with Odoo' }
+          console.error('Error syncing with Odoo:', error);
+          return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Failed to sync with Odoo'
+          };
         }
       },
 
