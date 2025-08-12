@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 27 100% 97%; /* #F9F7F3 */
+    --foreground: 210 10% 18%; /* #2E2E2E */
+
+    --primary: 179 100% 15%; /* #004F4D - Deep Teal */
+    --primary-foreground: 0 0% 98%; /* White */
+
+    --secondary: 40 100% 67%; /* #FFC857 - Warm Gold */
+    --secondary-foreground: 210 10% 18%; /* #2E2E2E - Dark Charcoal */
+
+    --muted: 210 10% 80%; /* A lighter grey for muted elements */
+    --muted-foreground: 210 10% 40%; /* A darker grey for muted text */
+
+    --accent: 210 10% 90%; /* A light grey for accents */
+    --accent-foreground: 210 10% 18%; /* #2E2E2E */
+
+    --border: 210 10% 85%; /* A light grey for borders */
+    --input: 210 10% 90%; /* A light grey for input backgrounds */
+    --ring: 210 10% 18%; /* Dark Charcoal for focus rings */
+
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 210 10% 18%; /* #2E2E2E */
+
+    --popover: 0 0% 100%; /* White */
+    --popover-foreground: 210 10% 18%; /* #2E2E2E */
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+  }
+
+  .dark {
+    /* Define dark mode colors if needed, but the prompt specifies light theme */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-semibold; /* Default heading weight */
+  }
+}
+
+/* Custom scrollbar for horizontal sections */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}

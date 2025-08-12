@@ -1,0 +1,44 @@
+/* Hide phone number fields in Clerk forms */
+[data-clerk-element="phoneNumber"],
+[data-clerk-element="phoneNumberField"],
+.cl-phoneNumber,
+.cl-phoneNumberField,
+.cl-formFieldInput[name="phoneNumber"],
+.cl-formFieldInput[type="tel"],
+input[name="phoneNumber"],
+input[type="tel"],
+input[placeholder*="phone"],
+input[placeholder*="Phone"],
+[class*="phoneNumber"],
+[class*="PhoneNumber"],
+div:has(input[name="phoneNumber"]),
+div:has(input[type="tel"]) {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  width: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  left: -9999px !important;
+}
+
+/* Hide any parent containers that only contain phone fields */
+.cl-formField:has(input[name="phoneNumber"]),
+.cl-formField:has(input[type="tel"]) {
+  display: none !important;
+}
+
+/* Hide OTP and SMS related elements */
+[data-clerk-element="otpCode"],
+[data-clerk-element="smsCode"],
+.cl-otpCode,
+.cl-smsCode {
+  display: none !important;
+}
+
+/* Force hide any verification step that might be phone-related */
+.cl-signUp-continue[data-localization-key*="phone"],
+.cl-signIn-continue[data-localization-key*="phone"] {
+  display: none !important;
+}

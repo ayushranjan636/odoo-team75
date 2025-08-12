@@ -1,0 +1,158 @@
+import { NextResponse } from "next/server"
+
+export async function GET() {
+  // Mock admin dashboard data
+  const adminData = {
+    kpis: {
+      totalRevenue: 2847500,
+      activeRentals: 1247,
+      lateReturns: 23,
+      avgTenure: 12,
+      depositLiability: 892300,
+    },
+    revenueData: [
+      { month: "Jan", revenue: 185000 },
+      { month: "Feb", revenue: 220000 },
+      { month: "Mar", revenue: 195000 },
+      { month: "Apr", revenue: 267000 },
+      { month: "May", revenue: 298000 },
+      { month: "Jun", revenue: 315000 },
+      { month: "Jul", revenue: 342000 },
+      { month: "Aug", revenue: 378000 },
+      { month: "Sep", revenue: 365000 },
+      { month: "Oct", revenue: 398000 },
+      { month: "Nov", revenue: 425000 },
+      { month: "Dec", revenue: 456000 },
+    ],
+    mostRentedItems: [
+      { name: "Office Chair", count: 156 },
+      { name: "Standing Desk", count: 134 },
+      { name: "Gaming Setup", count: 98 },
+      { name: "Home Theater", count: 87 },
+      { name: "Fitness Equipment", count: 76 },
+    ],
+    statusMix: [
+      { status: "Reserved", count: 342, fill: "#3b82f6" },
+      { status: "Picked Up", count: 567, fill: "#10b981" },
+      { status: "Returned", count: 234, fill: "#6b7280" },
+      { status: "Late", count: 23, fill: "#ef4444" },
+    ],
+    geoData: [
+      { city: "Bangalore", orders: 456, lat: 12.9716, lng: 77.5946 },
+      { city: "Mumbai", orders: 389, lat: 19.076, lng: 72.8777 },
+      { city: "Delhi", orders: 298, lat: 28.7041, lng: 77.1025 },
+      { city: "Chennai", orders: 234, lat: 13.0827, lng: 80.2707 },
+      { city: "Hyderabad", orders: 187, lat: 17.385, lng: 78.4867 },
+      { city: "Pune", orders: 156, lat: 18.5204, lng: 73.8567 },
+    ],
+    liveEvents: [
+      {
+        id: "1",
+        type: "order_confirmed",
+        message: "New order placed for Gaming Setup Package",
+        timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+        orderId: "ORD-1234567890",
+      },
+      {
+        id: "2",
+        type: "picked_up",
+        message: "Office furniture picked up from Bangalore location",
+        timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+        orderId: "ORD-0987654321",
+      },
+      {
+        id: "3",
+        type: "payment",
+        message: "Payment of ₹15,000 received for order",
+        timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+        orderId: "ORD-1122334455",
+      },
+      {
+        id: "4",
+        type: "returned",
+        message: "Home theater system returned in good condition",
+        timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+        orderId: "ORD-5566778899",
+      },
+      {
+        id: "5",
+        type: "late_flag",
+        message: "Fitness equipment return is 2 days overdue",
+        timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        orderId: "ORD-9988776655",
+      },
+      {
+        id: "6",
+        type: "order_confirmed",
+        message: "Bulk order for 5 office chairs confirmed",
+        timestamp: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
+        orderId: "ORD-4433221100",
+      },
+      {
+        id: "7",
+        type: "picked_up",
+        message: "Standing desk delivered to Mumbai customer",
+        timestamp: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
+        orderId: "ORD-6677889900",
+      },
+      {
+        id: "8",
+        type: "payment",
+        message: "Deposit refund of ₹8,500 processed",
+        timestamp: new Date(Date.now() - 150 * 60 * 1000).toISOString(),
+        orderId: "ORD-3344556677",
+      },
+      {
+        id: "9",
+        type: "returned",
+        message: "Gaming chair returned with minor wear",
+        timestamp: new Date(Date.now() - 180 * 60 * 1000).toISOString(),
+        orderId: "ORD-7788990011",
+      },
+      {
+        id: "10",
+        type: "order_confirmed",
+        message: "Premium furniture package ordered for corporate client",
+        timestamp: new Date(Date.now() - 210 * 60 * 1000).toISOString(),
+        orderId: "ORD-2233445566",
+      },
+      {
+        id: "11",
+        type: "picked_up",
+        message: "Exercise bike collected from Chennai location",
+        timestamp: new Date(Date.now() - 240 * 60 * 1000).toISOString(),
+        orderId: "ORD-8899001122",
+      },
+      {
+        id: "12",
+        type: "late_flag",
+        message: "Office desk return is 1 day overdue",
+        timestamp: new Date(Date.now() - 270 * 60 * 1000).toISOString(),
+        orderId: "ORD-5544332211",
+      },
+      {
+        id: "13",
+        type: "payment",
+        message: "Monthly subscription payment of ₹25,000 received",
+        timestamp: new Date(Date.now() - 300 * 60 * 1000).toISOString(),
+        orderId: "ORD-9900112233",
+      },
+      {
+        id: "14",
+        type: "returned",
+        message: "Complete home office setup returned successfully",
+        timestamp: new Date(Date.now() - 330 * 60 * 1000).toISOString(),
+        orderId: "ORD-1100223344",
+      },
+      {
+        id: "15",
+        type: "order_confirmed",
+        message: "Event furniture rental confirmed for 3-day conference",
+        timestamp: new Date(Date.now() - 360 * 60 * 1000).toISOString(),
+        orderId: "ORD-6655443322",
+      },
+    ],
+  }
+
+  return NextResponse.json(adminData)
+}
