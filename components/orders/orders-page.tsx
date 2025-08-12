@@ -5,9 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CalendarDays, Package, CreditCard, Clock, MapPin, Phone, Mail } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarDays, Package, CreditCard, Clock, MapPin, Phone, Mail, Calendar as CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
 import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
 
 interface OrderItem {
   productId: string
@@ -53,10 +56,15 @@ export function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("all")
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
+  const [calendarView, setCalendarView] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
     fetchOrders()
+    // Set up real-time updates
+    const interval = setInterval(fetchOrders, 30000) // Refresh every 30 seconds
+    return () => clearInterval(interval)
   }, [])
 
   const fetchOrders = async () => {
@@ -65,6 +73,7 @@ export function OrdersPage() {
       if (response.ok) {
         const data = await response.json()
         setOrders(data)
+        console.log('Orders fetched successfully:', data.length, 'orders')
       } else {
         // Fallback to mock data
         setOrders(getMockOrders())
@@ -153,38 +162,85 @@ export function OrdersPage() {
   const handlePayNow = async (order: Order) => {
     if (!order.installmentInfo) return
 
+    setLoading(true)
     toast({
       title: "Redirecting to Payment",
       description: `Processing payment of ₹${order.installmentInfo.nextPaymentAmount?.toLocaleString()} for ${order.id}`,
     })
 
-    // In a real application, this would redirect to payment gateway
-    setTimeout(() => {
-      toast({
-        title: "Payment Successful!",
-        description: "Your installment payment has been processed successfully.",
+    try {
+      // Create installment payment order
+      const paymentResponse = await fetch('/api/payment/installment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.id,
+          installmentAmount: order.installmentInfo.nextPaymentAmount,
+          installmentNumber: order.installmentInfo.currentInstallment + 1
+        })
       })
-      
-      // Update order status
-      setOrders(prev => prev.map(o => 
-        o.id === order.id 
-          ? {
-              ...o,
-              installmentInfo: {
-                ...o.installmentInfo!,
-                currentInstallment: o.installmentInfo!.currentInstallment + 1,
-                nextPaymentDate: o.installmentInfo!.currentInstallment + 1 < o.installmentInfo!.totalInstallments 
-                  ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-                  : undefined,
-                nextPaymentAmount: o.installmentInfo!.currentInstallment + 1 < o.installmentInfo!.totalInstallments 
-                  ? o.installmentInfo!.nextPaymentAmount
-                  : undefined
-              },
-              paymentStatus: o.installmentInfo!.currentInstallment + 1 >= o.installmentInfo!.totalInstallments ? "paid" : "installments"
-            }
-          : o
-      ))
-    }, 2000)
+
+      const paymentData = await paymentResponse.json()
+
+      if (paymentData.success) {
+        // In a real application, this would open Razorpay
+        // For demo, we'll simulate successful payment
+        setTimeout(() => {
+          toast({
+            title: "Payment Successful!",
+            description: "Your installment payment has been processed successfully.",
+          })
+          
+          // Update order status
+          setOrders(prev => prev.map(o => 
+            o.id === order.id 
+              ? {
+                  ...o,
+                  installmentInfo: {
+                    ...o.installmentInfo!,
+                    currentInstallment: o.installmentInfo!.currentInstallment + 1,
+                    nextPaymentDate: o.installmentInfo!.currentInstallment + 1 < o.installmentInfo!.totalInstallments 
+                      ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+                      : undefined,
+                    nextPaymentAmount: o.installmentInfo!.currentInstallment + 1 < o.installmentInfo!.totalInstallments 
+                      ? o.installmentInfo!.nextPaymentAmount
+                      : undefined
+                  },
+                  paymentStatus: o.installmentInfo!.currentInstallment + 1 >= o.installmentInfo!.totalInstallments ? "paid" : "installments"
+                }
+              : o
+          ))
+          setLoading(false)
+        }, 2000)
+      } else {
+        throw new Error(paymentData.error || 'Payment failed')
+      }
+    } catch (error) {
+      console.error('Payment error:', error)
+      toast({
+        title: "Payment Failed",
+        description: "There was an error processing your payment. Please try again.",
+        variant: "destructive",
+      })
+      setLoading(false)
+    }
+  }
+
+  const handleDownloadBill = (order: Order) => {
+    if (order.billNumber) {
+      const downloadUrl = `/api/payment/generate-bill/pdf?billNumber=${order.billNumber}&orderId=${order.id}&auto=true`
+      window.open(downloadUrl, '_blank')
+      toast({
+        title: "Downloading Bill",
+        description: `Invoice ${order.billNumber} is being downloaded.`,
+      })
+    } else {
+      toast({
+        title: "Bill Not Available",
+        description: "Bill is not yet generated for this order.",
+        variant: "destructive",
+      })
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -240,6 +296,38 @@ export function OrdersPage() {
           <h1 className="text-3xl font-bold">My Orders</h1>
           <p className="text-muted-foreground">Track your rental orders and manage payments</p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={calendarView ? "default" : "outline"}
+            onClick={() => setCalendarView(!calendarView)}
+            className="flex items-center gap-2"
+          >
+            <CalendarIcon className="h-4 w-4" />
+            {calendarView ? "List View" : "Calendar View"}
+          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "justify-start text-left font-normal",
+                  !selectedDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {/* Pending Payments Alert */}
@@ -283,7 +371,109 @@ export function OrdersPage() {
         </TabsList>
 
         <TabsContent value={activeTab} className="space-y-4">
-          {filteredOrders.length === 0 ? (
+          {calendarView ? (
+            <Card>
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-1">
+                    <h3 className="text-lg font-semibold mb-4">Select Date</h3>
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={setSelectedDate}
+                      className="rounded-md border"
+                      modifiers={{
+                        hasOrder: filteredOrders.flatMap(order => [
+                          order.deliveryDate ? new Date(order.deliveryDate) : [],
+                          order.returnDate ? new Date(order.returnDate) : []
+                        ].filter(Boolean)).flat()
+                      }}
+                      modifiersClassNames={{
+                        hasOrder: "bg-blue-100 text-blue-900 font-semibold"
+                      }}
+                    />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <h3 className="text-lg font-semibold mb-4">
+                      Orders for {selectedDate ? format(selectedDate, "PPP") : "Selected Date"}
+                    </h3>
+                    <div className="space-y-4">
+                      {filteredOrders
+                        .filter(order => {
+                          if (!selectedDate) return false
+                          const orderDate = new Date(order.createdAt)
+                          const deliveryDate = order.deliveryDate ? new Date(order.deliveryDate) : null
+                          const returnDate = order.returnDate ? new Date(order.returnDate) : null
+                          
+                          return (
+                            orderDate.toDateString() === selectedDate.toDateString() ||
+                            (deliveryDate && deliveryDate.toDateString() === selectedDate.toDateString()) ||
+                            (returnDate && returnDate.toDateString() === selectedDate.toDateString())
+                          )
+                        })
+                        .map(order => (
+                          <Card key={order.id} className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-semibold">{order.id}</h4>
+                                <p className="text-sm text-muted-foreground">
+                                  {order.items.length} item(s) • ₹{order.total.toLocaleString()}
+                                </p>
+                                <div className="flex gap-2 mt-2">
+                                  <Badge className={getStatusColor(order.status)}>
+                                    {order.status}
+                                  </Badge>
+                                  <Badge className={getPaymentStatusColor(order.paymentStatus)}>
+                                    {order.paymentStatus}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                {order.billNumber && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDownloadBill(order)}
+                                  >
+                                    📄 Download Bill
+                                  </Button>
+                                )}
+                                {order.installmentInfo?.nextPaymentAmount && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handlePayNow(order)}
+                                    disabled={loading}
+                                  >
+                                    Pay ₹{order.installmentInfo.nextPaymentAmount.toLocaleString()}
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                      {filteredOrders.filter(order => {
+                        if (!selectedDate) return false
+                        const orderDate = new Date(order.createdAt)
+                        const deliveryDate = order.deliveryDate ? new Date(order.deliveryDate) : null
+                        const returnDate = order.returnDate ? new Date(order.returnDate) : null
+                        
+                        return (
+                          orderDate.toDateString() === selectedDate.toDateString() ||
+                          (deliveryDate && deliveryDate.toDateString() === selectedDate.toDateString()) ||
+                          (returnDate && returnDate.toDateString() === selectedDate.toDateString())
+                        )
+                      }).length === 0 && (
+                        <div className="text-center py-8">
+                          <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <p className="text-muted-foreground">No orders found for this date</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : filteredOrders.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center h-64">
                 <Package className="h-12 w-12 text-muted-foreground mb-4" />
@@ -429,9 +619,19 @@ export function OrdersPage() {
                   {order.billNumber && (
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
                       <p>Bill Number: {order.billNumber}</p>
-                      {order.razorpayPaymentId && (
-                        <p>Payment ID: {order.razorpayPaymentId}</p>
-                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadBill(order)}
+                          className="text-xs"
+                        >
+                          📄 Download Bill
+                        </Button>
+                        {order.razorpayPaymentId && (
+                          <p>Payment ID: {order.razorpayPaymentId}</p>
+                        )}
+                      </div>
                     </div>
                   )}
                 </CardContent>

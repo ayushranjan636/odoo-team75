@@ -57,6 +57,14 @@ export function AdminOrdersPage() {
 
   useEffect(() => {
     fetchOrders()
+    
+    // Set up real-time order updates
+    const interval = setInterval(() => {
+      fetchOrders()
+      console.log('Admin dashboard: Checking for new orders...')
+    }, 10000) // Check every 10 seconds for new orders
+    
+    return () => clearInterval(interval)
   }, [currentPage, statusFilter, cityFilter, dateRange, searchTerm])
 
   const fetchOrders = async () => {
@@ -71,10 +79,31 @@ export function AdminOrdersPage() {
         ...(dateRange.to && { dateTo: dateRange.to.toISOString() }),
       })
 
+      console.log('Admin fetching orders with params:', params.toString())
+
       const response = await fetch(`/api/admin/orders?${params}`)
       const data = await response.json()
-      setOrders(data.orders)
-      setTotalPages(Math.ceil(data.total / 20))
+      
+      if (response.ok) {
+        // Check for new orders
+        const newOrderCount = data.orders.filter((order: any) => {
+          const orderTime = new Date(order.createdAt).getTime()
+          const fiveMinutesAgo = Date.now() - (5 * 60 * 1000)
+          return orderTime > fiveMinutesAgo
+        }).length
+
+        if (newOrderCount > 0 && orders.length > 0) {
+          // Show notification for new orders
+          toast.success(`${newOrderCount} new order(s) received!`)
+        }
+
+        setOrders(data.orders)
+        setTotalPages(Math.ceil(data.total / 20))
+        console.log(`Admin dashboard: Loaded ${data.orders.length} orders (${data.total} total)`)
+      } else {
+        console.error('Failed to fetch orders:', data.error)
+        toast.error("Failed to load orders")
+      }
     } catch (error) {
       console.error("Failed to fetch orders:", error)
       toast.error("Failed to load orders")
