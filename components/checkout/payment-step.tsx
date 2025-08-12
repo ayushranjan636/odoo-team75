@@ -3,10 +3,11 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, CreditCard, Shield, CheckCircle, Smartphone, Building2, RefreshCw } from "lucide-react"
+import { ArrowLeft, CreditCard, Shield, CheckCircle, Smartphone, Building2, RefreshCw, Tag, X } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
 import { useCartStore, type CartItem } from "@/hooks/use-cart-store"
 import { apiClient } from "@/lib/api"
@@ -36,12 +37,33 @@ export function PaymentStep({ onBack, contactData, deliveryData, cartItems, quot
   const [paymentMethod, setPaymentMethod] = useState("razorpay")
   const [apiError, setApiError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
+  
+  // Promo code state
+  const [promoCode, setPromoCode] = useState("")
+  const [appliedPromo, setAppliedPromo] = useState<any>(null)
+  const [promoLoading, setPromoLoading] = useState(false)
+  const [showInstallmentOption, setShowInstallmentOption] = useState(false)
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.pricePerUnit * item.qty, 0)
   const totalDeposit = cartItems.reduce((sum, item) => sum + item.deposit * item.qty, 0)
   const taxRate = 0.18 // 18% GST
-  const taxes = subtotal * taxRate
-  const total = subtotal + taxes
+  
+  // Calculate discount
+  let discount = 0
+  if (appliedPromo) {
+    if (appliedPromo.type === 'percentage') {
+      discount = (subtotal * appliedPromo.value) / 100
+      if (appliedPromo.maxDiscount) {
+        discount = Math.min(discount, appliedPromo.maxDiscount)
+      }
+    } else {
+      discount = appliedPromo.value
+    }
+  }
+  
+  const discountedSubtotal = subtotal - discount
+  const taxes = discountedSubtotal * taxRate
+  const total = discountedSubtotal + taxes
 
   const loadRazorpayScript = () => {
     return new Promise((resolve) => {
@@ -59,13 +81,63 @@ export function PaymentStep({ onBack, contactData, deliveryData, cartItems, quot
     })
   }
 
+  const validatePromoCode = async () => {
+    if (!promoCode.trim()) return
+    
+    setPromoLoading(true)
+    try {
+      const response = await fetch("/api/payment/promo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: promoCode.toUpperCase(),
+          orderAmount: subtotal,
+          customerId: contactData.email
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.valid) {
+        setAppliedPromo(result.promo)
+        toast({
+          title: "Promo Code Applied!",
+          description: `${result.promo.description} - You saved ${formatCurrency(result.discount)}`,
+        })
+      } else {
+        toast({
+          title: "Invalid Promo Code",
+          description: result.message || "This promo code is not valid for your order.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to validate promo code. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setPromoLoading(false)
+    }
+  }
+
+  const removePromoCode = () => {
+    setAppliedPromo(null)
+    setPromoCode("")
+    toast({
+      title: "Promo Code Removed",
+      description: "The discount has been removed from your order.",
+    })
+  }
+
   const createRazorpayOrder = async (orderData: any) => {
     try {
       const response = await fetch("/api/payment/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: Math.round(total * 100), // Amount in paise
+          amount: Math.round((showInstallmentOption ? total * 0.5 : total) * 100), // Amount in paise
           currency: "INR",
           orderId: orderData.id,
         }),
@@ -235,13 +307,22 @@ export function PaymentStep({ onBack, contactData, deliveryData, cartItems, quot
           productId: item.productId,
           name: item.name,
           image: item.image,
+          tenure: item.tenureType as any, // Cast to handle type conversion
           pricePerUnit: item.pricePerUnit,
           qty: item.qty,
           startAt: item.startDate.toISOString(),
           endAt: item.endDate.toISOString(),
         })),
-        total,
+        total: showInstallmentOption ? total * 0.5 : total,
         deposit: totalDeposit,
+        promoCode: appliedPromo?.code || null,
+        discount: discount,
+        installmentPlan: showInstallmentOption ? {
+          totalAmount: total,
+          paidAmount: total * 0.5,
+          remainingAmount: total * 0.5,
+          nextPaymentDue: deliveryData.deliveryDate.toISOString()
+        } : null,
         address: {
           name: contactData.name,
           phone: contactData.phone,
@@ -253,8 +334,8 @@ export function PaymentStep({ onBack, contactData, deliveryData, cartItems, quot
         },
         deliveryMethod: `${deliveryData.deliveryDate.toLocaleDateString()} ${deliveryData.deliveryTimeSlot}`,
         returnMethod: `${deliveryData.returnDate.toLocaleDateString()} ${deliveryData.returnTimeSlot}`,
-        paymentStatus: "pending",
-        status: "quotation",
+        paymentStatus: "pending" as const,
+        status: "quotation" as const,
         quoteId: quoteId || null,
       }
 
@@ -394,11 +475,99 @@ export function PaymentStep({ onBack, contactData, deliveryData, cartItems, quot
 
           <Separator />
 
+          {/* Promo Code Section */}
+          <div>
+            <h4 className="text-sm font-medium text-foreground mb-3">Promo Code</h4>
+            {appliedPromo ? (
+              <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Tag className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-700">{appliedPromo.code}</span>
+                  <span className="text-xs text-green-600">({appliedPromo.description})</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={removePromoCode}
+                  className="h-auto p-1 text-green-600 hover:text-green-700"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter promo code"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                  className="flex-1"
+                  onKeyPress={(e) => e.key === 'Enter' && validatePromoCode()}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={validatePromoCode}
+                  disabled={!promoCode.trim() || promoLoading}
+                  className="bg-transparent"
+                >
+                  {promoLoading ? "Checking..." : "Apply"}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Installment Options */}
+          {total > 10000 && (
+            <>
+              <div>
+                <h4 className="text-sm font-medium text-foreground mb-3">Payment Options</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="full-payment"
+                      name="paymentOption"
+                      checked={!showInstallmentOption}
+                      onChange={() => setShowInstallmentOption(false)}
+                      className="h-4 w-4 text-primary"
+                    />
+                    <Label htmlFor="full-payment" className="text-sm cursor-pointer">
+                      Pay Full Amount - {formatCurrency(total)}
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="installment-payment"
+                      name="paymentOption"
+                      checked={showInstallmentOption}
+                      onChange={() => setShowInstallmentOption(true)}
+                      className="h-4 w-4 text-primary"
+                    />
+                    <Label htmlFor="installment-payment" className="text-sm cursor-pointer">
+                      Pay in Installments - {formatCurrency(total * 0.5)} now, {formatCurrency(total * 0.5)} later
+                    </Label>
+                  </div>
+                </div>
+              </div>
+              <Separator />
+            </>
+          )}
+
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
               <span className="text-foreground">{formatCurrency(subtotal)}</span>
             </div>
+            {appliedPromo && discount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-green-600">Discount ({appliedPromo.code})</span>
+                <span className="text-green-600">-{formatCurrency(discount)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Security Deposit</span>
               <span className="text-foreground">{formatCurrency(totalDeposit)}</span>
@@ -409,9 +578,19 @@ export function PaymentStep({ onBack, contactData, deliveryData, cartItems, quot
             </div>
             <Separator />
             <div className="flex justify-between text-lg font-semibold">
-              <span className="text-foreground">Total Amount</span>
-              <span className="text-primary">{formatCurrency(total)}</span>
+              <span className="text-foreground">
+                {showInstallmentOption ? "Pay Now (50%)" : "Total Amount"}
+              </span>
+              <span className="text-primary">
+                {formatCurrency(showInstallmentOption ? total * 0.5 : total)}
+              </span>
             </div>
+            {showInstallmentOption && (
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Remaining amount due at delivery</span>
+                <span>{formatCurrency(total * 0.5)}</span>
+              </div>
+            )}
             <div className="text-xs text-muted-foreground">*Security deposit will be refunded after return</div>
           </div>
         </div>
@@ -536,7 +715,8 @@ export function PaymentStep({ onBack, contactData, deliveryData, cartItems, quot
           ) : (
             <>
               <CheckCircle className="mr-2 h-4 w-4" />
-              Pay {formatCurrency(total)}
+              Pay {formatCurrency(showInstallmentOption ? total * 0.5 : total)}
+              {showInstallmentOption && " (First Installment)"}
             </>
           )}
         </Button>

@@ -374,26 +374,28 @@ export function OrdersPage() {
           {calendarView ? (
             <Card>
               <CardContent className="p-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-1">
+                <div className="flex flex-col lg:flex-row gap-6">
+                  <div className="lg:w-80 flex-shrink-0">
                     <h3 className="text-lg font-semibold mb-4">Select Date</h3>
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      className="rounded-md border"
-                      modifiers={{
-                        hasOrder: filteredOrders.flatMap(order => [
-                          order.deliveryDate ? new Date(order.deliveryDate) : [],
-                          order.returnDate ? new Date(order.returnDate) : []
-                        ].filter(Boolean)).flat()
-                      }}
-                      modifiersClassNames={{
-                        hasOrder: "bg-blue-100 text-blue-900 font-semibold"
-                      }}
-                    />
+                    <div className="flex justify-center">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
+                        className="rounded-md border w-fit"
+                        modifiers={{
+                          hasOrder: filteredOrders.flatMap(order => [
+                            order.deliveryDate ? new Date(order.deliveryDate) : [],
+                            order.returnDate ? new Date(order.returnDate) : []
+                          ].filter(Boolean)).flat()
+                        }}
+                        modifiersClassNames={{
+                          hasOrder: "bg-blue-100 text-blue-900 font-semibold"
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="lg:col-span-2">
+                  <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-semibold mb-4">
                       Orders for {selectedDate ? format(selectedDate, "PPP") : "Selected Date"}
                     </h3>

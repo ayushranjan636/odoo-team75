@@ -77,6 +77,36 @@ const promoCodes: PromoCode[] = [
     isActive: true,
     description: "Monthly special - 30% off on premium rentals",
     createdAt: new Date().toISOString()
+  },
+  {
+    id: "PROMO-5",
+    code: "STUDENT15",
+    type: "percentage",
+    value: 15,
+    minOrderAmount: 1500,
+    maxDiscount: 750,
+    usageLimit: 100,
+    usedCount: 22,
+    validFrom: new Date("2025-01-01").toISOString(),
+    validUntil: new Date("2025-12-31").toISOString(),
+    isActive: true,
+    description: "Student discount - 15% off for educational purposes",
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "PROMO-6",
+    code: "PROF20",
+    type: "percentage",
+    value: 20,
+    minOrderAmount: 2500,
+    maxDiscount: 1500,
+    usageLimit: 50,
+    usedCount: 5,
+    validFrom: new Date("2025-01-01").toISOString(),
+    validUntil: new Date("2025-12-31").toISOString(),
+    isActive: true,
+    description: "Professor special - 20% off for academic demonstrations",
+    createdAt: new Date().toISOString()
   }
 ]
 

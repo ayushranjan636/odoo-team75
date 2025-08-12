@@ -10,7 +10,7 @@ import { Toaster } from "@/components/ui/toaster" // Import Toaster for toasts
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" }) // Configure Inter font
 
 export const metadata: Metadata = {
-  title: "Rentify - Endless Options, One Rent",
+  title: "Rentkro - Endless Options, One Rent",
   description: "Rent furniture, appliances, electronics, and more with flexible terms and a premium experience.",
     generator: 'Team75'
 }
